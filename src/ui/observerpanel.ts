@@ -7,6 +7,7 @@
 import { plainClientHello, sealEch } from '../ech/ech';
 import { observeClientHello, type ObserverReport } from '../ech/observer';
 import { asciiStrings, chip, el, hexDump, legend, type HighlightSpan } from './dom';
+import { pause } from './motion';
 import { PRESET_HOSTS, SERVER_IP, setHostname, state } from './state';
 
 function observedList(report: ObserverReport): HTMLElement {
@@ -34,13 +35,23 @@ function stringsRow(wire: Uint8Array): HTMLElement {
   );
 }
 
-function wireCard(
-  title: string,
-  subtitle: string,
-  wire: Uint8Array,
-  report: ObserverReport,
-  verdict: HTMLElement[],
-): HTMLElement {
+interface WireCardSpec {
+  title: string;
+  subtitle: string;
+  wire: Uint8Array;
+  report: ObserverReport;
+  verdict: HTMLElement[];
+}
+
+/**
+ * A card that reveals in steps as the observer "does its work": the packet
+ * shell first, then the wire bytes, then the parsed observation, then the
+ * verdict. Each step returns after its own pause so both cards can be
+ * advanced in lockstep by the caller. Under reduced motion the pauses are
+ * zero, so the whole card lands at once.
+ */
+function stagedWireCard(spec: WireCardSpec): { card: HTMLElement; steps: (() => Promise<void>)[] } {
+  const { title, subtitle, wire, report, verdict } = spec;
   const highlights: HighlightSpan[] = [];
   if (report.sniValueSpan) {
     highlights.push({
@@ -52,18 +63,33 @@ function wireCard(
   if (report.echPayloadSpan) {
     highlights.push({ span: report.echPayloadSpan, cls: 'hl-ok', label: 'ECH payload (HPKE ciphertext, opaque)' });
   }
-  const card = el('article', { class: 'wirecard' });
-  card.append(
-    el('h4', {}, title),
-    el('p', { class: 'note' }, subtitle),
-    hexDump(wire, highlights, `${title}: ClientHello bytes as the observer sees them`),
-    legend(highlights),
-    stringsRow(wire),
-    el('h5', {}, 'What this observer learned'),
-    observedList(report),
-    el('div', { class: 'verdicts' }, ...verdict),
-  );
-  return card;
+
+  const body = el('div', { class: 'wirecard-body' });
+  const card = el('article', { class: 'wirecard' }, el('h4', {}, title), el('p', { class: 'note' }, subtitle), body);
+
+  const steps: (() => Promise<void>)[] = [
+    async () => {
+      body.append(
+        el('p', { class: 'step-status' }, el('span', { class: 'step-dot', 'aria-hidden': 'true' }, '▸'), ' Bytes on the wire'),
+        hexDump(wire, highlights, `${title}: ClientHello bytes as the observer sees them`),
+        legend(highlights),
+      );
+      await pause(650);
+    },
+    async () => {
+      body.append(
+        el('p', { class: 'step-status' }, el('span', { class: 'step-dot', 'aria-hidden': 'true' }, '▸'), ' What the observer read from those bytes'),
+        stringsRow(wire),
+        observedList(report),
+      );
+      await pause(650);
+    },
+    async () => {
+      body.append(el('div', { class: 'verdicts reveal' }, ...verdict));
+      await pause(250);
+    },
+  ];
+  return { card, steps };
 }
 
 export function observerPanel(): HTMLElement {
@@ -112,12 +138,14 @@ export function observerPanel(): HTMLElement {
   );
   panel.append(controls);
 
-  const results = el('div', { class: 'wire-grid', role: 'status', 'aria-live': 'polite' });
-  panel.append(results);
+  const narrator = el('p', { class: 'obs-narrator', role: 'status', 'aria-live': 'polite' });
+  const results = el('div', { class: 'wire-grid' });
+  panel.append(narrator, results);
 
   async function run(): Promise<void> {
     runBtn.disabled = true;
-    results.replaceChildren(el('p', { class: 'note' }, 'Building ClientHellos…'));
+    narrator.textContent = 'Building both ClientHellos and sealing the ECH one…';
+    results.replaceChildren();
     try {
       const host = state.hostname;
       const plainWire = plainClientHello(host);
@@ -130,34 +158,50 @@ export function observerPanel(): HTMLElement {
       const plainExposed = plainReport.sniVisible === host;
       const echExposed = echReport.sniVisible === host;
 
-      const plainCard = wireCard(
-        'WITHOUT ECH',
-        'TLS 1.3 will encrypt the certificate and everything after the handshake — but this first packet names your destination in cleartext.',
-        plainWire,
-        plainReport,
-        [
+      const plain = stagedWireCard({
+        title: 'WITHOUT ECH',
+        subtitle:
+          'TLS 1.3 will encrypt the certificate and everything after the handshake — but this first packet names your destination in cleartext.',
+        wire: plainWire,
+        report: plainReport,
+        verdict: [
           chip('fact', 'TLS 1.3 crypto:', 'flawless — every record after the handshake is encrypted (protocol property; the handshake itself lives in the tls-handshake lab)'),
           plainExposed
             ? chip('alarm', 'Privacy verdict:', `observer read your destination “${plainReport.sniVisible}” — EXPOSED`)
             : chip('ok', 'Privacy verdict:', 'destination not present in this packet'),
         ],
-      );
-      const echCard = wireCard(
-        'WITH ECH',
-        'Same ClientHello shape. The SNI now carries the provider’s decoy public name; your real destination rides inside the HPKE ciphertext.',
-        sealed.wire,
-        echReport,
-        [
+      });
+      const ech = stagedWireCard({
+        title: 'WITH ECH',
+        subtitle:
+          'Same ClientHello shape. The SNI now carries the provider’s decoy public name; your real destination rides inside the HPKE ciphertext.',
+        wire: sealed.wire,
+        report: echReport,
+        verdict: [
           chip('fact', 'HPKE seal:', `real RFC 9180 Base-mode encryption to the server’s key (payload ${sealed.payload.length} B)`),
           echExposed
             ? chip('alarm', 'Privacy verdict:', 'observer read your destination — EXPOSED')
             : chip('ok', 'Privacy verdict:', `observer read only “${echReport.sniVisible}” — your destination stayed inside the ciphertext`),
           chip('warn', 'One condition:', 'this holds only if the ECHConfig lookup was also encrypted — see “The bootstrap problem” below'),
         ],
-      );
-      results.replaceChildren(plainCard, echCard);
+      });
+
+      results.append(plain.card, ech.card);
+
+      // Advance both cards in lockstep so the learner watches the SAME observer
+      // do the SAME work to two packets and sees the one field diverge.
+      const narration = [
+        'Both packets are on the wire. Reading the raw bytes…',
+        'The observer parses each packet — watch the SNI field.',
+        'Verdicts, computed from what the observer actually read:',
+      ];
+      for (let i = 0; i < plain.steps.length; i++) {
+        narrator.textContent = narration[i];
+        await Promise.all([plain.steps[i](), ech.steps[i]()]);
+      }
+      narrator.textContent = 'Same wire, same observer, one field — that field is the whole point of ECH.';
     } catch (e) {
-      results.replaceChildren(el('p', { class: 'note' }, `Failed: ${(e as Error).message}`));
+      narrator.textContent = `Failed: ${(e as Error).message}`;
     } finally {
       runBtn.disabled = false;
     }

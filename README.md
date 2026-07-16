@@ -14,12 +14,13 @@ This lab is the first consumer of the fleet's HPKE hub: every seal and open runs
 
 ## Exhibits
 
-1. **The observer panel** (the headline): pick a destination, put two genuinely-built ClientHellos on the wire — plain and ECH — and read them through the same byte-level observer. Without ECH the hostname is literally legible in the hex dump's ASCII column; with ECH the observer gets the decoy name and an opaque HPKE payload. The observer also honestly reports what ECH does **not** hide: destination IP, ALPN, ECH's own presence, config_id, payload length.
-2. **Inner and outer**: step through the construction — inner ClientHello, the emptied-and-padded `EncodedClientHelloInner`, the HPKE seal with `info = "tls ech" ‖ 0x00 ‖ ECHConfig`, and the outer-with-zeroed-payload that is the AAD. Then run the swap attack: rewrite the outer around the stolen ciphertext and watch the real AEAD open fail.
+1. **The observer panel** (the headline): pick a destination, put two genuinely-built ClientHellos on the wire — plain and ECH — and watch the **same** observer parse both in stepped reveal (bytes → what it read → verdict), so you see the one field diverge. Without ECH the hostname is literally legible in the hex dump's ASCII column; with ECH the observer gets the decoy name and an opaque HPKE payload. The observer also honestly reports what ECH does **not** hide: destination IP, ALPN, ECH's own presence, config_id, payload length. (The reveal collapses to instant under `prefers-reduced-motion`.)
+2. **Inner and outer**: step through the construction — inner ClientHello, the emptied-and-padded `EncodedClientHelloInner`, the HPKE seal with `info = "tls ech" ‖ 0x00 ‖ ECHConfig`, and the outer-with-zeroed-payload that is the AAD. The splice step is **computed, not asserted**: it diffs the AAD against the final wire byte-for-byte and shows every differing byte falls inside the payload slot (zero outside). Then run the swap attack: rewrite the outer around the stolen ciphertext and watch the real AEAD open fail.
 3. **The bootstrap problem** (the honest centerpiece): the ECH key arrives via the DNS HTTPS record (real RFC 9460 RDATA encoding shown). Run the lookup over plaintext DNS and the observer reads your destination before TLS ever starts; switch to encrypted DNS (modeled, labelled) to close the leak. The circularity is named in-page: ECH requires DoH/DoT to mean anything.
 4. **Break it yourself**: flip one bit of the ECHConfig public key, or use a stale key after the server rotates — the server's real HPKE decryption fails, fail-closed, and the retry_configs recovery path completes a successful second attempt.
-5. **GREASE**: a client with no ECHConfig sends a fake ECH extension; a field-for-field comparison (computed from the parsed bytes, not asserted) shows the observer has no bit to select on. If only ECH users sent ECH, ECH would be a selector.
-6. **Deployment honesty**: draft status, real deployment, real blocking, and precisely what this demo does and does not prove.
+5. **Whose key did you encrypt to?**: the config-authenticity attack. An active attacker substitutes their own ECHConfig (same public name, same config_id, their key); the client seals to it and **the attacker really decrypts and reads your destination** — valid cryptography, wrong recipient, rendered as ALARM not success. A delivery-channel table then shows why plaintext DNS is forgeable but retry_configs (inside the public name's certificate-authenticated TLS) is not.
+6. **GREASE**: a client with no ECHConfig sends a fake ECH extension; a field-for-field comparison (computed from the parsed bytes, not asserted) shows the observer has no bit to select on. If only ECH users sent ECH, ECH would be a selector.
+7. **Deployment honesty**: draft status, real deployment, real blocking, and precisely what this demo does and does not prove.
 
 ## When to Use It
 
@@ -39,6 +40,7 @@ This lab is the first consumer of the fleet's HPKE hub: every seal and open runs
 - **Tampered ECHConfig** — sealing to a corrupted key is a denial of ECH, not a disclosure: the decryption fails closed and the name stays inside the ciphertext.
 - **Networks that block ECH** — clients that retry without ECH trade privacy for availability; that boundary is a policy choice, not a cryptographic one.
 - **A dedicated IP** — ECH hides *which* site behind a shared provider; an IP hosting one site identifies itself.
+- **A substituted config** — ECH's privacy is only as trustworthy as the channel that delivered the ECHConfig. An attacker who can forge that channel (plaintext DNS) hands the client their own key and reads the destination with valid cryptography. Exhibit 5 runs this live.
 
 ## Real-World Usage
 
@@ -54,7 +56,7 @@ git clone https://github.com/systemslibrarian/crypto-lab-blind-hello
 cd crypto-lab-hpke-envelope && npm ci && cd ..
 cd crypto-lab-blind-hello && npm ci
 npm run dev        # serve
-npm test           # unit tests + KATs (46)
+npm test           # unit tests + KATs (48)
 npm run build      # typecheck + production build
 npm run test:a11y  # axe WCAG 2.1 AA gate, both themes (requires: npx playwright install chromium)
 ```
@@ -68,7 +70,7 @@ npm run test:a11y  # axe WCAG 2.1 AA gate, both themes (requires: npx playwright
 
 ## Build & Verify
 
-- **46 unit tests** (Vitest), all passing, including **known-answer tests from RFC 9180 Appendix A run through the consumed hub**: the two Base-mode vectors this lab's suite uses — A.1.1 (DHKEM(X25519, HKDF-SHA256), HKDF-SHA256, AES-128-GCM) and A.2.1 (ChaCha20-Poly1305) — covering key derivation, encapsulation/decapsulation, the full key schedule, all 10 vector encryptions with nonce sequencing, and all 6 exporter values. ECH itself is an IETF draft and publishes no test vectors; the ECH layer is verified by round-trip against the real HPKE, strict-parser fail-closed tests, AAD-binding/tamper tests, padding-equalization tests, and GREASE indistinguishability checks — and this README says so rather than inventing vectors.
+- **48 unit tests** (Vitest), all passing, including **known-answer tests from RFC 9180 Appendix A run through the consumed hub**: the two Base-mode vectors this lab's suite uses — A.1.1 (DHKEM(X25519, HKDF-SHA256), HKDF-SHA256, AES-128-GCM) and A.2.1 (ChaCha20-Poly1305) — covering key derivation, encapsulation/decapsulation, the full key schedule, all 10 vector encryptions with nonce sequencing, and all 6 exporter values. ECH itself is an IETF draft and publishes no test vectors; the ECH layer is verified by round-trip against the real HPKE, strict-parser fail-closed tests, AAD-binding/tamper tests, padding-equalization tests, and GREASE indistinguishability checks — and this README says so rather than inventing vectors.
 - **Accessibility gate**: `@axe-core/playwright` scans the production build in both themes for WCAG 2.1 A/AA with every interactive flow driven first; the Pages deploy is blocked on failure.
 - **Deploy**: GitHub Actions checks out this repo and the hub side by side, runs typecheck → tests → build → a11y gate → Pages.
 

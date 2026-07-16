@@ -4,6 +4,7 @@ import { observerPanel } from './ui/observerpanel';
 import { innerOuterPanel } from './ui/innerouter';
 import { dnsPanel } from './ui/dnspanel';
 import { breakItPanel } from './ui/breakit';
+import { trustPanel } from './ui/trustpanel';
 import { greasePanel } from './ui/grease';
 import { deploymentPanel } from './ui/deployment';
 
@@ -18,6 +19,7 @@ main.append(
   innerOuterPanel(),
   dnsPanel(),
   breakItPanel(),
+  trustPanel(),
   greasePanel(),
   deploymentPanel(),
 );

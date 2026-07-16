@@ -227,6 +227,31 @@ mark.hl-info { background-color: var(--hl-info-bg); color: var(--hl-info-ink); }
   background-color: color-mix(in oklab, var(--accent) 4%, var(--surface));
 }
 .wirecard h4 { margin-top: 0; letter-spacing: 0.08em; }
+.wirecard-body { display: flex; flex-direction: column; }
+.obs-narrator {
+  min-height: 1.4em;
+  font-weight: 600;
+  color: var(--accent-text);
+}
+.step-status {
+  margin: 0.7rem 0 0.1rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+.step-dot { color: var(--accent-text); margin-right: 0.3rem; }
+/* Purposeful reveal: each step fades in as the observer produces it. Tied to
+   an action, never idle — and disabled entirely under reduced motion. */
+.wirecard-body > *, .verdicts.reveal { animation: step-in 0.35s ease both; }
+@keyframes step-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wirecard-body > *, .verdicts.reveal { animation: none; }
+}
 .obs-list { list-style: none; padding-left: 0 !important; font-size: 0.9rem; }
 .obs-list li { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: baseline; }
 .vis { flex: 0 0 auto; }
@@ -266,6 +291,11 @@ mark.hl-info { background-color: var(--hl-info-bg); color: var(--hl-info-ink); }
 .fieldtable th[scope='row'] { color: var(--text-dim); font-weight: 600; white-space: nowrap; }
 .fieldtable.compare th[scope='col'] { color: var(--accent-text); }
 .facts { font-size: 0.95rem; max-width: 80ch; }
+
+.swap-flag { font-weight: 600; white-space: nowrap; }
+.swap-yes { color: var(--alarm-text); }
+.swap-no { color: var(--ok-text); }
+.swap-note { display: block; margin-top: 0.15rem; }
 
 @media (max-width: 640px) {
   .controls { align-items: stretch; flex-direction: column; }

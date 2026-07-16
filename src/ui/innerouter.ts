@@ -13,6 +13,57 @@ function stage(n: number, title: string, ...body: (HTMLElement | string)[]): HTM
   return el('li', { class: 'stage' }, el('h4', {}, `${n}. ${title}`), ...body);
 }
 
+/**
+ * Stage 5, shown not told: compute where the AAD (payload zeroed) and the
+ * final wire (payload spliced) actually differ, and prove every differing
+ * byte lies inside the payload slot. If a single byte outside the slot
+ * differed, the "the whole outer is the AAD" claim would be false — so this
+ * is computed and displayed, not asserted in prose.
+ */
+function spliceStage(sealed: SealResult): HTMLElement {
+  const ann = annotateClientHello(sealed.wire);
+  const echExt = ann.extensions.find((e) => e.type === 0xfe0d)!;
+  const slot = { start: echExt.bodySpan.end - sealed.payload.length, end: echExt.bodySpan.end };
+
+  const diffIdx: number[] = [];
+  const len = Math.min(sealed.aad.length, sealed.wire.length);
+  for (let i = 0; i < len; i++) if (sealed.aad[i] !== sealed.wire[i]) diffIdx.push(i);
+  const outsideSlot = diffIdx.filter((i) => i < slot.start || i >= slot.end).length;
+  const sameLength = sealed.aad.length === sealed.wire.length;
+
+  const highlights: HighlightSpan[] = diffIdx.map((i) => ({ span: { start: i, end: i + 1 }, cls: 'hl-ok', label: '' }));
+  // one legend entry instead of one per byte
+  const legendHl: HighlightSpan[] = [
+    { span: slot, cls: 'hl-ok', label: `bytes that changed (all ${diffIdx.length} inside the payload slot)` },
+    ...(ann.sniValueSpan ? [{ span: ann.sniValueSpan, cls: 'hl-info' as const, label: 'outer SNI — unchanged by the splice' }] : []),
+  ];
+
+  return stage(
+    5,
+    'Splice — and prove nothing else moved',
+    el(
+      'p',
+      { class: 'note' },
+      'The final wire below is the AAD with the ciphertext dropped into the slot. Highlighted: every byte that differs between the AAD and the wire.',
+    ),
+    hexDump(sealed.wire, highlights, 'Final ClientHelloOuter; highlighted bytes are those that differ from the AAD'),
+    legend(legendHl),
+    el(
+      'div',
+      { class: 'verdicts' },
+      chip(
+        outsideSlot === 0 && sameLength ? 'ok' : 'alarm',
+        'Computed diff:',
+        `${diffIdx.length} of ${sealed.wire.length} bytes differ; ${diffIdx.length - outsideSlot} inside the payload slot [${slot.start}, ${slot.end}), ${outsideSlot} outside it. ` +
+          (outsideSlot === 0 && sameLength
+            ? 'Zero bytes outside the slot changed — so the AAD is exactly the rest of the outer, and any tampering anywhere else would change what the server authenticates.'
+            : 'Unexpected: a byte outside the payload slot changed.'),
+      ),
+      el('p', { class: 'note' }, el('code', {}, `payload := ${truncHex(sealed.payload, 12)}`)),
+    ),
+  );
+}
+
 export function innerOuterPanel(): HTMLElement {
   const panel = el('section', { class: 'panel', 'aria-labelledby': 'io-h' });
   panel.append(
@@ -94,11 +145,7 @@ export function innerOuterPanel(): HTMLElement {
           hexDump(sealed.aad, aadHighlights, 'The AAD: outer ClientHello with a zeroed payload slot'),
           legend(aadHighlights),
         ),
-        stage(
-          5,
-          'Splice — the sealed payload drops into the slot; everything else is byte-identical',
-          el('p', {}, el('code', {}, `wire = AAD with payload := ${truncHex(sealed.payload, 12)}`)),
-        ),
+        spliceStage(sealed),
       );
       swapBtn.disabled = false;
     } finally {

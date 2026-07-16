@@ -9,14 +9,19 @@ const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
  * scanned DOM — what passes is the page in its fullest state.
  */
 async function prepare(page: Page): Promise<void> {
+  // Collapse the observer panel's staged reveal to instant, matching what
+  // motion-sensitive users get, so the scan sees the fully-revealed page.
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.addStyleTag({ content: `*,*::before,*::after{animation:none!important;transition:none!important}` });
   await page.evaluate(() => {
     document.querySelectorAll('details').forEach((d) => ((d as HTMLDetailsElement).open = true));
   });
 
-  // headline observer panel
+  // headline observer panel — reducedMotion collapses the staged reveal, so
+  // the verdicts land immediately; wait for them before scanning.
   await page.getByRole('button', { name: 'Send both ClientHellos' }).click();
   await expect(page.locator('.wirecard')).toHaveCount(2);
+  await expect(page.locator('.wirecard .verdicts')).toHaveCount(2);
 
   // inner/outer construction + swap attack
   await page.getByRole('button', { name: 'Build and seal' }).click();
@@ -35,6 +40,10 @@ async function prepare(page: Page): Promise<void> {
   const retry = page.getByRole('button', { name: /retry with the fresh/i });
   await expect(retry).toBeEnabled();
   await retry.click();
+
+  // trust / substituted-config attack
+  await page.getByRole('button', { name: /substituted-config attack/i }).click();
+  await expect(page.locator('.trust-out .chip-alarm')).toBeVisible();
 
   // GREASE comparison
   await page.getByRole('button', { name: /GREASE client on the wire/ }).click();

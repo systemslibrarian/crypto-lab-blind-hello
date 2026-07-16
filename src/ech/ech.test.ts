@@ -221,6 +221,30 @@ describe('inner encoding invariants', () => {
   });
 });
 
+describe('substituted ECHConfig — the disclosure the delivery channel must prevent', () => {
+  const IKM_A = utf8('blind-hello ATTACKER ikm — 32 bytes !!!');
+
+  test('an attacker whose config the client accepted really reads the inner name', async () => {
+    // Same public name, same config_id, the ATTACKER's key: exactly what an
+    // active attacker on a plaintext DNS path could hand the client.
+    const attacker = new EchServer('public.cdn.example', { configId: 42, ikm: IKM_A });
+    const sealed = await sealEch({ innerServerName: 'bank.example.com', config: attacker.config, ephemeralIkm: IKM_E });
+    const stolen = await attacker.accept(sealed.wire);
+    expect(stolen.hpkeOpen).toBe('ok');
+    expect(stolen.action).toBe('accepted-inner');
+    expect(stolen.innerSni).toBe('bank.example.com');
+  });
+
+  test('the real server, shown the same wire, cannot decrypt it', async () => {
+    const attacker = new EchServer('public.cdn.example', { configId: 42, ikm: IKM_A });
+    const server = freshServer(); // also config_id 42 — forces a genuine trial decryption
+    const sealed = await sealEch({ innerServerName: 'bank.example.com', config: attacker.config, ephemeralIkm: IKM_E });
+    const result = await server.accept(sealed.wire);
+    expect(result.hpkeOpen).toBe('fail');
+    expect(result.innerSni).toBeUndefined();
+  });
+});
+
 describe('a ClientHello with no ECH at all', () => {
   test('server just proceeds with the visible SNI (this is the pre-ECH world)', async () => {
     const server = freshServer();
