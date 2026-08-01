@@ -8,6 +8,15 @@
   --surface: #131736;
   --surface-2: #1a2044;
   --border: #333c6e;
+  /* Control boundaries only (#app input[type=text], #app select). Those controls
+     are filled with --surface-2, which sits at 1.19:1 against the --surface panel
+     behind them, so the 1px border is the only thing delineating the control and
+     WCAG 2.1 SC 1.4.11 requires 3:1. --border measured 1.80:1 at best / 1.23:1 at
+     worst; --border-strong is 3.83:1 on --bg, 3.55:1 on --surface, 3.21:1 on
+     --surface-2. --border is unchanged and still carries every decorative rule
+     (panel and hero outlines, hexdump frame, stage boxes, table and footer
+     rules). */
+  --border-strong: #686f94;
   --text: #e9ecf8;
   --text-dim: #adb5d6;
   --accent-text: #a8b3fa;
@@ -28,6 +37,8 @@ html[data-theme='light'] {
   --surface: #ffffff;
   --surface-2: #eaecf9;
   --border: #c3c9e4;
+  /* 3.50:1 on --bg, 3.78:1 on --surface, 3.22:1 on --surface-2 (was 1.64 / 1.26). */
+  --border-strong: #7f8394;
   --text: #191d3a;
   --text-dim: #4a5178;
   --accent-text: #3730a3;
@@ -147,7 +158,7 @@ body {
 #app input[type='text'] {
   background-color: var(--surface-2);
   color: var(--text);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: 8px;
   padding: 0.45rem 0.6rem;
   min-width: 15rem;
@@ -162,7 +173,7 @@ body {
   background-position: right 0.5rem center;
   background-size: 0.9rem;
   color: var(--text);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: 8px;
   padding: 0.45rem 1.8rem 0.45rem 0.6rem;
   font: inherit;
