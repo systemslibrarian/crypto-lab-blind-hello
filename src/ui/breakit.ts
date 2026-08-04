@@ -5,8 +5,8 @@
  */
 import { parseECHConfigList } from '../ech/echconfig';
 import { sealEch, tamperConfigPublicKey } from '../ech/ech';
-import { chip, el } from './dom';
-import { state } from './state';
+import { chip, el, staleNotice } from './dom';
+import { onLabInputChange, rotateServerKey, state } from './state';
 
 export function breakItPanel(): HTMLElement {
   const panel = el('section', { class: 'panel', 'aria-labelledby': 'break-h' });
@@ -60,7 +60,10 @@ export function breakItPanel(): HTMLElement {
     staleBtn.disabled = true;
     try {
       const staleConfig = state.server.config; // the copy a resolver cached yesterday
-      state.server.rotateKey();
+      // Rotating through the shared state also retires every result on the
+      // page that was computed against the key being replaced — including this
+      // panel's own previous output, which is rewritten below.
+      rotateServerKey();
       const sealed = await sealEch({ innerServerName: state.hostname, config: staleConfig });
       const result = await state.server.accept(sealed.wire);
       retryList = result.retryConfigs;
@@ -95,6 +98,16 @@ export function breakItPanel(): HTMLElement {
       retryBtn.disabled = true;
     }
   }
+
+  // retry_configs are only the right configs for the run that offered them: a
+  // new destination or a further rotation makes the held list the wrong thing
+  // to retry with, so the recovery button goes back to disabled.
+  onLabInputChange(() => {
+    if (!out.firstChild && retryList === undefined) return;
+    retryList = undefined;
+    retryBtn.disabled = true;
+    out.replaceChildren(staleNotice('that result (and any retry_configs it offered)', 'Run it again.'));
+  });
 
   tamperBtn.addEventListener('click', () => void tamper());
   staleBtn.addEventListener('click', () => void stale());

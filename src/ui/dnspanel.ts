@@ -5,8 +5,8 @@
  */
 import { serializeECHConfigList } from '../ech/echconfig';
 import { encodeHttpsRdata, observeDnsLookup, type DnsTransport } from '../dns/httpsrr';
-import { chip, el, fieldTable, hexDump } from './dom';
-import { RESOLVER_IP, state } from './state';
+import { chip, el, fieldTable, hexDump, staleNotice } from './dom';
+import { onLabInputChange, RESOLVER_IP, state } from './state';
 
 export function dnsPanel(): HTMLElement {
   const panel = el('section', { class: 'panel', 'aria-labelledby': 'dns-h' });
@@ -100,6 +100,13 @@ export function dnsPanel(): HTMLElement {
       ),
     );
   }
+
+  // The record names the destination and carries the server's current
+  // ECHConfig bytes; both change out from under it.
+  onLabInputChange(() => {
+    if (!out.firstChild) return;
+    out.replaceChildren(staleNotice('that lookup', 'Look up the ECHConfig again.'));
+  });
 
   lookupBtn.addEventListener('click', run);
   return panel;

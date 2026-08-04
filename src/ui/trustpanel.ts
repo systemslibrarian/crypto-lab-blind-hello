@@ -10,8 +10,8 @@
  * delivery channel for the first config.
  */
 import { EchServer, sealEch } from '../ech/ech';
-import { chip, el, fieldTable } from './dom';
-import { PUBLIC_NAME, state } from './state';
+import { chip, el, fieldTable, staleNotice } from './dom';
+import { onLabInputChange, PUBLIC_NAME, state } from './state';
 
 interface Channel {
   id: 'dns-plaintext' | 'dns-doh' | 'retry-configs';
@@ -160,6 +160,22 @@ export function trustPanel(): HTMLElement {
       runBtn.disabled = false;
     }
   }
+
+  // The substitution verdict is a claim about one destination, sealed to one
+  // attacker-supplied config, checked against one honest server key. Rotate the
+  // key or pick another destination and it describes neither run: the honest
+  // server would now fail to open that ClientHello for a reason that has
+  // nothing to do with the swap this panel exists to demonstrate. Retire it
+  // rather than leave it to be read as current.
+  onLabInputChange(() => {
+    if (!out.firstChild) return;
+    out.replaceChildren(
+      staleNotice(
+        'this substitution result',
+        'Run the substitution again to see it for the current inputs.',
+      ),
+    );
+  });
 
   runBtn.addEventListener('click', () => void run());
   return panel;

@@ -39,6 +39,19 @@ export function chip(kind: ChipKind, label: string, text: string): HTMLElement {
   );
 }
 
+/**
+ * Replaces a result whose inputs have since changed. A retired result says so
+ * and names the control that regenerates it — it is never silently blanked,
+ * and never left on screen to be re-read as current.
+ */
+export function staleNotice(what: string, rerun: string): HTMLElement {
+  return el(
+    'p',
+    { class: 'note stale-note' },
+    `Inputs changed: ${what} was computed for a different destination or a different server key, so it has been retired. ${rerun}`,
+  );
+}
+
 export interface HighlightSpan {
   span: Span;
   cls: 'hl-alarm' | 'hl-ok' | 'hl-info';

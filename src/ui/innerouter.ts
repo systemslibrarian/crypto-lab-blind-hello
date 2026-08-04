@@ -5,9 +5,9 @@
  */
 import { annotateClientHello } from '../ech/clienthello';
 import { sealEch, swapOuterSni, type SealResult } from '../ech/ech';
-import { chip, el, fieldTable, hexDump, legend, truncHex, type HighlightSpan } from './dom';
+import { chip, el, fieldTable, hexDump, legend, staleNotice, truncHex, type HighlightSpan } from './dom';
 import { LABS } from './links';
-import { state } from './state';
+import { onLabInputChange, state } from './state';
 
 function stage(n: number, title: string, ...body: (HTMLElement | string)[]): HTMLElement {
   return el('li', { class: 'stage' }, el('h4', {}, `${n}. ${title}`), ...body);
@@ -179,6 +179,21 @@ export function innerOuterPanel(): HTMLElement {
       swapBtn.disabled = false;
     }
   }
+
+  // The swap attack's whole claim is that the AAD binding — and nothing else —
+  // is what made the open fail. Once the server has rotated its key, this
+  // sealed message would fail to open with or without the swap, so the stored
+  // construction is dropped and the attack button goes back to disabled rather
+  // than producing a verdict that credits the wrong cause.
+  onLabInputChange(() => {
+    if (!sealed) return;
+    sealed = undefined;
+    swapBtn.disabled = true;
+    stages.replaceChildren();
+    attackOut.replaceChildren(
+      staleNotice('this construction (and any swap-attack result)', 'Build and seal again.'),
+    );
+  });
 
   buildBtn.addEventListener('click', () => void build());
   swapBtn.addEventListener('click', () => void attack());

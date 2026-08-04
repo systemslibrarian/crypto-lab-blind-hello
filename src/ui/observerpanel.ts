@@ -8,7 +8,7 @@ import { plainClientHello, sealEch } from '../ech/ech';
 import { observeClientHello, type ObserverReport } from '../ech/observer';
 import { asciiStrings, chip, el, hexDump, legend, type HighlightSpan } from './dom';
 import { pause } from './motion';
-import { PRESET_HOSTS, SERVER_IP, setHostname, state } from './state';
+import { onLabInputChange, PRESET_HOSTS, SERVER_IP, setHostname, state } from './state';
 
 function observedList(report: ObserverReport): HTMLElement {
   const ul = el('ul', { class: 'obs-list', role: 'list' });
@@ -206,6 +206,16 @@ export function observerPanel(): HTMLElement {
       runBtn.disabled = false;
     }
   }
+
+  // A privacy verdict names the destination it was computed for. Change the
+  // destination and that verdict is about a hostname you are no longer sending,
+  // so it is retired rather than left under the new selection.
+  onLabInputChange(() => {
+    if (!results.firstChild) return;
+    results.replaceChildren();
+    narrator.textContent =
+      'Inputs changed: those verdicts were computed for a different destination or a different server key, so they have been retired. Send both ClientHellos again.';
+  });
 
   runBtn.addEventListener('click', () => void run());
   return panel;

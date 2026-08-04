@@ -18,11 +18,36 @@ export const state = {
 type Listener = () => void;
 const listeners: Listener[] = [];
 
-export function onHostnameChange(fn: Listener): void {
+/**
+ * Every result on this page is computed from two inputs: the destination the
+ * learner picked, and the server's current HPKE key. When either changes, a
+ * result already on screen describes a run that no longer matches what the
+ * controls say — "observer read your destination bank.example.com" sitting
+ * under a select that now reads news.example.org, or a swap-attack verdict
+ * blaming the AAD binding for a failure the key rotation would have caused
+ * anyway. Panels subscribe here and retire their own output rather than leave
+ * a stale verdict to be re-read as current.
+ */
+export function onLabInputChange(fn: Listener): void {
   listeners.push(fn);
 }
 
-export function setHostname(name: string): void {
-  state.hostname = name;
+function notify(): void {
   for (const fn of listeners) fn();
+}
+
+export function setHostname(name: string): void {
+  if (name === state.hostname) return;
+  state.hostname = name;
+  notify();
+}
+
+/**
+ * Rotate the server's HPKE key (the stale-cached-config scenario). Everything
+ * already rendered was sealed to, or decrypted with, the previous key — so
+ * this is an input change like any other.
+ */
+export function rotateServerKey(): void {
+  state.server.rotateKey();
+  notify();
 }
