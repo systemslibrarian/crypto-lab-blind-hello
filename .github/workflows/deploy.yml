@@ -23,14 +23,14 @@ jobs:
         working-directory: crypto-lab-blind-hello
     steps:
       - name: Checkout this lab
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: crypto-lab-blind-hello
 
       # This lab CONSUMES the fleet's HPKE implementation from the hub repo —
       # it must sit next to this checkout exactly as it does in local dev.
       - name: Checkout the HPKE hub (crypto-lab-hpke-envelope)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: systemslibrarian/crypto-lab-hpke-envelope
           path: crypto-lab-hpke-envelope
