@@ -5,7 +5,7 @@
 import { greaseClientHello, sealEch } from '../ech/ech';
 import { observeClientHello } from '../ech/observer';
 import { AEAD_NAMES, type AeadId } from '../ech/hub';
-import { chip, el } from './dom';
+import { chip, el, tableShell } from './dom';
 import { PUBLIC_NAME, SERVER_IP, state } from './state';
 
 export function greasePanel(): HTMLElement {
@@ -61,7 +61,7 @@ export function greasePanel(): HTMLElement {
         real.echOuter!.aeadId === fake.echOuter!.aeadId;
 
       out.replaceChildren(
-        table,
+        tableShell(table, 'Real ECH client versus GREASE client, field by field'),
         el(
           'div',
           { class: 'verdicts' },

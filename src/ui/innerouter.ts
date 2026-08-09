@@ -5,7 +5,7 @@
  */
 import { annotateClientHello } from '../ech/clienthello';
 import { sealEch, swapOuterSni, type SealResult } from '../ech/ech';
-import { chip, el, fieldTable, hexDump, legend, staleNotice, truncHex, type HighlightSpan } from './dom';
+import { chip, el, fieldTable, hexDump, legend, setListItems, staleNotice, truncHex, type HighlightSpan } from './dom';
 import { LABS } from './links';
 import { onLabInputChange, state } from './state';
 
@@ -81,7 +81,9 @@ export function innerOuterPanel(): HTMLElement {
   const swapBtn = el('button', { class: 'btn', type: 'button', disabled: true }, 'Attack: swap the outer (rewrite outer SNI, keep the ciphertext)');
   panel.append(el('div', { class: 'controls' }, buildBtn, swapBtn));
 
-  const stages = el('ol', { class: 'stages', role: 'list' });
+  // `role="list"` is attached by `setListItems` only while the list has
+  // stages in it — see the note there on empty `role="list"`.
+  const stages = el('ol', { class: 'stages' });
   const attackOut = el('div', { class: 'verdicts', role: 'status', 'aria-live': 'polite' });
   panel.append(stages, attackOut);
 
@@ -104,7 +106,7 @@ export function innerOuterPanel(): HTMLElement {
         });
       }
 
-      stages.replaceChildren(
+      setListItems(stages, [
         stage(
           1,
           'ClientHelloInner — the truth',
@@ -146,7 +148,7 @@ export function innerOuterPanel(): HTMLElement {
           legend(aadHighlights),
         ),
         spliceStage(sealed),
-      );
+      ]);
       swapBtn.disabled = false;
     } finally {
       buildBtn.disabled = false;
@@ -189,7 +191,7 @@ export function innerOuterPanel(): HTMLElement {
     if (!sealed) return;
     sealed = undefined;
     swapBtn.disabled = true;
-    stages.replaceChildren();
+    setListItems(stages, []);
     attackOut.replaceChildren(
       staleNotice('this construction (and any swap-attack result)', 'Build and seal again.'),
     );

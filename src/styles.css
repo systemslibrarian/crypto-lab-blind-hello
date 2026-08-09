@@ -116,7 +116,13 @@ body {
 .cl-hero-title{margin:0;font-size:clamp(1.6rem,3.8vw,2.7rem);font-weight:700;line-height:1.1;letter-spacing:.01em;}
 .cl-hero-sub{margin:.4rem 0 0;font-size:clamp(.9rem,1.6vw,1.05rem);letter-spacing:.01em;opacity:.85;}
 .cl-hero-desc{margin:.55rem 0 0;font-size:1rem;line-height:1.5;color:var(--text-dim);max-width:60ch;}
-.cl-hero-why{flex:0 1 min(40%,26rem);min-width:min(100%,15rem);border:1px solid var(--border);border-radius:10px;padding:.85rem 1.05rem;background:color-mix(in oklab,var(--accent) 6%,transparent);}
+/* box-sizing is border-box because the narrow-viewport rule below gives this
+   aside `width: 100%`, and this stylesheet sets no global box-sizing. Under the
+   default content-box that 100% is the CONTENT width, so the 1.05rem side
+   padding and 1px borders land OUTSIDE it: at 380px the aside measured 384px
+   inside a 348px column, its flex line grew to match, and the whole DOCUMENT
+   scrolled 20px sideways (WCAG 1.4.10). */
+.cl-hero-why{box-sizing:border-box;flex:0 1 min(40%,26rem);min-width:min(100%,15rem);border:1px solid var(--border);border-radius:10px;padding:.85rem 1.05rem;background:color-mix(in oklab,var(--accent) 6%,transparent);}
 .cl-hero-why-label{display:block;font-size:.68rem;font-weight:700;letter-spacing:.14em;}
 .cl-hero-why-text{margin:.35rem 0 0;font-size:.95rem;line-height:1.5;}
 @media (max-width:640px){.cl-hero{flex-direction:column;}.cl-hero-why{flex-basis:auto;width:100%;}.cl-hero-main{flex-basis:auto;min-width:0;}}
@@ -300,8 +306,24 @@ mark.hl-info { background-color: var(--hl-info-bg); color: var(--hl-info-ink); }
   border-bottom: 1px solid var(--border);
   vertical-align: top;
 }
+/* Field values are routinely raw hex — stage 3 prints `truncHex`'s 32-character
+   ephemeral KEM share into a cell — and a hex run offers no soft wrap
+   opportunity at all, so its full width becomes the table's min-content width.
+   At 380px that made the HPKE table 358px inside a 279px column and pushed the
+   whole document to 419px (WCAG 1.4.10). `anywhere`, not `break-word`:
+   `break-word` breaks the token when it is laid out but still contributes the
+   UNBROKEN token to min-content, so the table would stay exactly as wide. */
+.fieldtable td { overflow-wrap: anywhere; }
 .fieldtable th[scope='row'] { color: var(--text-dim); font-weight: 600; white-space: nowrap; }
 .fieldtable.compare th[scope='col'] { color: var(--accent-text); }
+/* A side-by-side comparison needs its columns side by side — stacking them
+   destroys the comparison, which is the two-dimensional-layout case WCAG 1.4.10
+   exempts. The exemption does not extend to dragging the whole document
+   sideways with it, so the overflow is confined to the table: at 380px the
+   delivery-channel table needs 501px and used to make the document 538px wide.
+   Keyboard reachability of the scroller comes from the tabindex `tableShell`
+   sets (WCAG 2.1.1). */
+.table-shell { overflow-x: auto; max-width: 100%; }
 .facts { font-size: 0.95rem; max-width: 80ch; }
 
 .swap-flag { font-weight: 600; white-space: nowrap; }

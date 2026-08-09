@@ -10,7 +10,7 @@
  * delivery channel for the first config.
  */
 import { EchServer, sealEch } from '../ech/ech';
-import { chip, el, fieldTable, staleNotice } from './dom';
+import { chip, el, fieldTable, staleNotice, tableShell } from './dom';
 import { onLabInputChange, PUBLIC_NAME, state } from './state';
 
 interface Channel {
@@ -104,7 +104,10 @@ export function trustPanel(): HTMLElement {
     );
   }
   table.append(tbody);
-  panel.append(el('h3', {}, 'The three ways a client gets an ECHConfig'), table);
+  panel.append(
+    el('h3', {}, 'The three ways a client gets an ECHConfig'),
+    tableShell(table, 'ECHConfig delivery channels comparison'),
+  );
 
   panel.append(
     el(

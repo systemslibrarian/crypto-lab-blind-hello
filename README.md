@@ -58,7 +58,7 @@ cd crypto-lab-blind-hello && npm ci
 npm run dev        # serve
 npm test           # unit tests + KATs (48)
 npm run build      # typecheck + production build
-npm run test:a11y  # axe WCAG 2.1 AA gate, both themes (requires: npx playwright install chromium)
+npm run test:a11y  # WCAG 2.1 AA gate, 2 themes x 2 viewports (requires: npx playwright install chromium)
 ```
 
 ## Related Demos
@@ -71,7 +71,7 @@ npm run test:a11y  # axe WCAG 2.1 AA gate, both themes (requires: npx playwright
 ## Build & Verify
 
 - **48 unit tests** (Vitest), all passing, including **known-answer tests from RFC 9180 Appendix A run through the consumed hub**: the two Base-mode vectors this lab's suite uses — A.1.1 (DHKEM(X25519, HKDF-SHA256), HKDF-SHA256, AES-128-GCM) and A.2.1 (ChaCha20-Poly1305) — covering key derivation, encapsulation/decapsulation, the full key schedule, all 10 vector encryptions with nonce sequencing, and all 6 exporter values. ECH itself is an IETF draft and publishes no test vectors; the ECH layer is verified by round-trip against the real HPKE, strict-parser fail-closed tests, AAD-binding/tamper tests, padding-equalization tests, and GREASE indistinguishability checks — and this README says so rather than inventing vectors.
-- **Accessibility gate**: `@axe-core/playwright` scans the production build in both themes for WCAG 2.1 A/AA with every interactive flow driven first; the Pages deploy is blocked on failure.
+- **Accessibility gate**: the production build is driven the way a visitor drives it — both ClientHellos observed, the destination changed so stale verdicts retire, the outer swapped, the lookup run over plaintext DNS and then DoH, the config tampered and recovered, the server key rotated, the substituted-config attack run, GREASE compared — and **scanned after every single step**, in both themes at 1280px and 380px. Nothing is injected into the page: reduced motion is asked for and asserted, so the lab's own `prefers-reduced-motion` block is exercised rather than bypassed. `violations` is not the whole oracle — the gate also fails on axe's `incomplete` bucket, on an arithmetic composite-aware contrast measurement (opacity and `color-mix()` included), on any scrolling region with no keyboard route, on any horizontal document overflow, and on any visible text left at `opacity: 0`. The Pages deploy is blocked on failure.
 - **Deploy**: GitHub Actions checks out this repo and the hub side by side, runs typecheck → tests → build → a11y gate → Pages.
 
 ---

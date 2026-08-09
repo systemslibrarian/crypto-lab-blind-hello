@@ -140,6 +140,40 @@ export function fieldTable(caption: string, rows: [string, string][]): HTMLEleme
   return table;
 }
 
+/**
+ * Give a wide comparison table its own horizontal scroller.
+ *
+ * A side-by-side comparison is a genuinely two-dimensional layout: stacking its
+ * columns destroys the comparison that is the entire point of it, which is the
+ * case WCAG 1.4.10 exempts. The exemption is not a licence to push the DOCUMENT
+ * sideways, though — at 380px the three-way delivery-channel table needs 501px
+ * and dragged the whole page's scrollWidth to 538px, so every paragraph on the
+ * page scrolled horizontally with it. Confining the overflow to the table
+ * itself keeps the page reflowed and the table intact; `tabindex` then makes
+ * the scroller a focus target arrow keys can drive (WCAG 2.1.1), since a table
+ * of plain cells holds nothing focusable of its own.
+ */
+export function tableShell(table: HTMLElement, ariaLabel: string): HTMLElement {
+  return el('div', { class: 'table-shell', tabindex: '0', role: 'region', 'aria-label': ariaLabel }, table);
+}
+
+/**
+ * Fill a styled list, carrying its `role="list"` with its contents.
+ *
+ * `list-style: none` strips list semantics in Safari/VoiceOver, so `.stages`
+ * declares `role="list"` explicitly. An EMPTY `role="list"` is a different
+ * thing: `aria-required-children` requires a `list` to own `listitem`s, so a
+ * list element that exists before its content does — as `.stages` does on every
+ * page load, and again every time an input change retires the construction — is
+ * an ARIA error sitting on the page from first paint. Attach the role with the
+ * items and drop it when they go.
+ */
+export function setListItems(list: HTMLElement, items: HTMLElement[]): void {
+  list.replaceChildren(...items);
+  if (items.length) list.setAttribute('role', 'list');
+  else list.removeAttribute('role');
+}
+
 export function truncHex(bytes: Uint8Array, keep = 12): string {
   let s = '';
   for (let i = 0; i < Math.min(keep, bytes.length); i++) s += bytes[i].toString(16).padStart(2, '0');

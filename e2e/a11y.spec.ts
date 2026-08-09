@@ -1,74 +1,38 @@
-import AxeBuilder from '@axe-core/playwright';
-import { expect, test, type Page } from '@playwright/test';
-
-const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
+import { test } from '@playwright/test';
+import { boot, driveAllStates, NARROW, reportCollected } from './gate';
 
 /**
- * Reveal collapsed content and drive every interaction so the dynamic result
- * regions (observer cards, verdict chips, attack outputs) are present in the
- * scanned DOM — what passes is the page in its fullest state.
+ * WCAG A/AA regression gate.
+ *
+ * The lab is driven the way a visitor drives it: both ClientHellos put on the
+ * wire and observed, the destination changed so the verdicts that named the old
+ * one are retired, the custom-hostname branch of that fork taken, the
+ * inner/outer construction built through its splice proof and then attacked by
+ * swapping the outer, the ECHConfig looked up over plaintext DNS and then over
+ * DoH, the config tampered and recovered, the server key rotated so every other
+ * panel retires at once, the substituted-config attack run, GREASE compared
+ * against a real client, and the glossary opened by its own summary. Every
+ * resulting state is scanned in both themes at desktop and phone width.
+ *
+ * See `gate.ts` for why nothing is injected into the page, why reduced motion is
+ * asked for rather than forced, why the lab's defaults are asserted rather than
+ * assumed, why every step is scanned rather than only the last, and why
+ * `violations` is not the whole oracle.
  */
-async function prepare(page: Page): Promise<void> {
-  // Collapse the observer panel's staged reveal to instant, matching what
-  // motion-sensitive users get, so the scan sees the fully-revealed page.
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.addStyleTag({ content: `*,*::before,*::after{animation:none!important;transition:none!important}` });
-  await page.evaluate(() => {
-    document.querySelectorAll('details').forEach((d) => ((d as HTMLDetailsElement).open = true));
+
+for (const theme of ['dark', 'light'] as const) {
+  test(`no WCAG A/AA violations in ${theme} theme`, async ({ page }) => {
+    test.setTimeout(900_000);
+    await boot(page, theme);
+    await driveAllStates(page, theme);
+    reportCollected();
   });
 
-  // headline observer panel — reducedMotion collapses the staged reveal, so
-  // the verdicts land immediately; wait for them before scanning.
-  await page.getByRole('button', { name: 'Send both ClientHellos' }).click();
-  await expect(page.locator('.wirecard')).toHaveCount(2);
-  await expect(page.locator('.wirecard .verdicts')).toHaveCount(2);
-
-  // inner/outer construction + swap attack
-  await page.getByRole('button', { name: 'Build and seal' }).click();
-  const swap = page.getByRole('button', { name: /swap the outer/i });
-  await expect(swap).toBeEnabled();
-  await swap.click();
-
-  // DNS bootstrap: plaintext, then DoH re-run
-  await page.getByRole('button', { name: 'Look up the ECHConfig' }).click();
-  await page.locator('#dns-doh').check();
-  await page.getByRole('button', { name: 'Look up the ECHConfig' }).click();
-
-  // break-it: tamper, then stale + retry
-  await page.getByRole('button', { name: /Tamper the ECHConfig/ }).click();
-  await page.getByRole('button', { name: /Use a stale key/ }).click();
-  const retry = page.getByRole('button', { name: /retry with the fresh/i });
-  await expect(retry).toBeEnabled();
-  await retry.click();
-
-  // trust / substituted-config attack
-  await page.getByRole('button', { name: /substituted-config attack/i }).click();
-  await expect(page.locator('.trust-out .chip-alarm')).toBeVisible();
-
-  // GREASE comparison
-  await page.getByRole('button', { name: /GREASE client on the wire/ }).click();
-  await expect(page.locator('.grease-out table')).toBeVisible();
-
-  await page.waitForTimeout(400);
+  test(`no WCAG A/AA violations in ${theme} theme at 380px`, async ({ page }) => {
+    test.setTimeout(900_000);
+    await page.setViewportSize(NARROW);
+    await boot(page, theme);
+    await driveAllStates(page, `${theme} @380px`);
+    reportCollected();
+  });
 }
-
-async function scan(page: Page): Promise<void> {
-  const { violations } = await new AxeBuilder({ page }).withTags(TAGS).analyze();
-  expect(
-    violations.map((v) => ({ id: v.id, impact: v.impact, nodes: v.nodes.map((n) => n.target.join(' ')).slice(0, 5) })),
-  ).toEqual([]);
-}
-
-test('no WCAG A/AA violations — dark theme', async ({ page }) => {
-  await page.goto('.');
-  await prepare(page);
-  await scan(page);
-});
-
-test('no WCAG A/AA violations — light theme', async ({ page }) => {
-  await page.goto('.');
-  await page.locator('#cl-theme-toggle').click();
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
-  await prepare(page);
-  await scan(page);
-});
