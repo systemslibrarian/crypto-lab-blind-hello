@@ -1,5 +1,5 @@
 /**
- * TLS presentation-language byte encoding (RFC 8446 §3) — hand-rolled because
+ * TLS presentation-language byte encoding (RFC 9846 §3) — hand-rolled because
  * the wire layout is exactly what this lab exists to expose: which bytes of a
  * ClientHello an on-path observer can read.
  *

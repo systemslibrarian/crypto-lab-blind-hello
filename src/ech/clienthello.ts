@@ -1,5 +1,5 @@
 /**
- * TLS 1.3 ClientHello (RFC 8446 §4.1.2) — real byte-level serialization and a
+ * TLS 1.3 ClientHello (RFC 9846 §4.2.2) — real byte-level serialization and a
  * strict parser, because the whole lab is about which of these bytes an
  * observer can read. Only the ClientHello is built here; the rest of the
  * handshake is out of scope (see crypto-lab-tls-handshake).

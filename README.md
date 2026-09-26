@@ -4,7 +4,7 @@
 
 ## What It Is
 
-TLS 1.3 (RFC 8446) encrypts the server's certificate and every byte after the handshake — and then announces the destination hostname in cleartext, in the SNI field of the very first packet. Encrypted Client Hello (draft-ietf-tls-esni; problem statement in RFC 8744) is HPKE (RFC 9180) applied to that one field: the client builds a second, secret ClientHello naming the real destination, seals it to the server's published key, and ships it inside a decoy ClientHello that names only the provider's public hostname.
+TLS 1.3 (RFC 9846) encrypts the server's certificate and every byte after the handshake — and then announces the destination hostname in cleartext, in the SNI field of the very first packet. Encrypted Client Hello (draft-ietf-tls-esni; problem statement in RFC 8744) is HPKE (RFC 9180) applied to that one field: the client builds a second, secret ClientHello naming the real destination, seals it to the server's published key, and ships it inside a decoy ClientHello that names only the provider's public hostname.
 
 The lesson: a protocol can be cryptographically flawless and still leak the metadata that actually matters. Both indicators are rendered separately throughout this demo — "the crypto is valid" and "your hostname leaked" are shown side by side, because both are true at once.
 
