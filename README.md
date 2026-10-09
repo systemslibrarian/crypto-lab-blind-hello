@@ -4,7 +4,7 @@
 
 ## What It Is
 
-TLS 1.3 (RFC 9846) encrypts the server's certificate and every byte after the handshake — and then announces the destination hostname in cleartext, in the SNI field of the very first packet. Encrypted Client Hello (draft-ietf-tls-esni; problem statement in RFC 8744) is HPKE (RFC 9180) applied to that one field: the client builds a second, secret ClientHello naming the real destination, seals it to the server's published key, and ships it inside a decoy ClientHello that names only the provider's public hostname.
+TLS 1.3 (RFC 9846) encrypts the server's certificate and every byte after the handshake — and then announces the destination hostname in cleartext, in the SNI field of the very first packet. Encrypted Client Hello ([RFC 9849, March 2026](https://www.rfc-editor.org/rfc/rfc9849.html); problem statement in RFC 8744) is HPKE (RFC 9180) applied to that one field: the client builds a second, secret ClientHello naming the real destination, seals it to the server's published key, and ships it inside a decoy ClientHello that names only the provider's public hostname.
 
 The lesson: a protocol can be cryptographically flawless and still leak the metadata that actually matters. Both indicators are rendered separately throughout this demo — "the crypto is valid" and "your hostname leaked" are shown side by side, because both are true at once.
 
@@ -20,7 +20,7 @@ This lab is the first consumer of the fleet's HPKE hub: every seal and open runs
 4. **Break it yourself**: flip one bit of the ECHConfig public key, or use a stale key after the server rotates — the server's real HPKE decryption fails, fail-closed, and the retry_configs recovery path completes a successful second attempt.
 5. **Whose key did you encrypt to?**: the config-authenticity attack. An active attacker substitutes their own ECHConfig (same public name, same config_id, their key); the client seals to it and **the attacker really decrypts and reads your destination** — valid cryptography, wrong recipient, rendered as ALARM not success. A delivery-channel table then shows why plaintext DNS is forgeable but retry_configs (inside the public name's certificate-authenticated TLS) is not.
 6. **GREASE**: a client with no ECHConfig sends a fake ECH extension; a field-for-field comparison (computed from the parsed bytes, not asserted) shows the observer has no bit to select on. If only ECH users sent ECH, ECH would be a selector.
-7. **Deployment honesty**: draft status, real deployment, real blocking, and precisely what this demo does and does not prove.
+7. **Deployment honesty**: RFC 9849 status, deployment examples, blocking versus authenticated retry/disablement and enterprise policy, and precisely what this demo does and does not prove.
 
 ## When to Use It
 
@@ -36,9 +36,11 @@ This lab is the first consumer of the fleet's HPKE hub: every seal and open runs
 ## What Can Go Wrong
 
 - **Plaintext DNS next to ECH** — the lookup for the ECH key announces the name ECH exists to hide. The protection is spent before TLS starts.
-- **Stale ECHConfig** — DNS caches outlive key rotations; the draft's answer is trial decryption plus retry_configs, both runnable here.
+- **Stale ECHConfig** — DNS caches outlive key rotations; RFC 9849 describes trial decryption plus authenticated retry_configs. This lab models the authentication step; it does not implement the outer TLS handshake.
 - **Tampered ECHConfig** — sealing to a corrupted key is a denial of ECH, not a disclosure: the decryption fails closed and the name stays inside the ciphertext.
-- **Networks that block ECH** — clients that retry without ECH trade privacy for availability; that boundary is a policy choice, not a cryptographic one.
+- **Networks that block ECH** — dropping traffic can deny availability. After ECH rejection, [RFC 9849 §6.1.6](https://www.rfc-editor.org/rfc/rfc9849.html#section-6.1.6) requires public-name authentication of the outer handshake; authentication or handshake failure must fail and must not be treated as a secure signal to disable ECH. After successful authentication and handshake completion, the rejected connection is aborted before application data. Supported retry_configs guide a new ECH attempt. If no retry config has a supported version, the server omits the ECH extension in EncryptedExtensions, or an earlier TLS version was negotiated, the authenticated result can securely disable ECH and guide a new connection without it.
+- **Unauthenticated DNS configuration** — an attacker can strip or substitute ECH configurations before an ECH attempt ([§10.2](https://www.rfc-editor.org/rfc/rfc9849.html#section-10.2)); this differs from dropping an attempted ECH connection.
+- **Enterprise policy** — managed clients may disable ECH under implementation-specific policy ([§8.2](https://www.rfc-editor.org/rfc/rfc9849.html#section-8.2)). This is protocol guidance, not a browser-product fallback test.
 - **A dedicated IP** — ECH hides *which* site behind a shared provider; an IP hosting one site identifies itself.
 - **A substituted config** — ECH's privacy is only as trustworthy as the channel that delivered the ECHConfig. An attacker who can forge that channel (plaintext DNS) hands the client their own key and reads the destination with valid cryptography. Exhibit 5 runs this live.
 
@@ -70,7 +72,7 @@ npm run test:a11y  # WCAG 2.1 AA gate, 2 themes x 2 viewports (requires: npx pla
 
 ## Build & Verify
 
-- **48 unit tests** (Vitest), all passing, including **known-answer tests from RFC 9180 Appendix A run through the consumed hub**: the two Base-mode vectors this lab's suite uses — A.1.1 (DHKEM(X25519, HKDF-SHA256), HKDF-SHA256, AES-128-GCM) and A.2.1 (ChaCha20-Poly1305) — covering key derivation, encapsulation/decapsulation, the full key schedule, all 10 vector encryptions with nonce sequencing, and all 6 exporter values. ECH itself is an IETF draft and publishes no test vectors; the ECH layer is verified by round-trip against the real HPKE, strict-parser fail-closed tests, AAD-binding/tamper tests, padding-equalization tests, and GREASE indistinguishability checks — and this README says so rather than inventing vectors.
+- **48 unit tests** (Vitest), all passing, including **known-answer tests from RFC 9180 Appendix A run through the consumed hub**: the two Base-mode vectors this lab's suite uses — A.1.1 (DHKEM(X25519, HKDF-SHA256), HKDF-SHA256, AES-128-GCM) and A.2.1 (ChaCha20-Poly1305) — covering key derivation, encapsulation/decapsulation, the full key schedule, all 10 vector encryptions with nonce sequencing, and all 6 exporter values. The ECH layer has no external ECH known-answer vectors in this suite; the ECH layer is verified by round-trip against the real HPKE, strict-parser fail-closed tests, AAD-binding/tamper tests, padding-equalization tests, and GREASE indistinguishability checks — and this README says so rather than inventing vectors.
 - **Accessibility gate**: the production build is driven the way a visitor drives it — both ClientHellos observed, the destination changed so stale verdicts retire, the outer swapped, the lookup run over plaintext DNS and then DoH, the config tampered and recovered, the server key rotated, the substituted-config attack run, GREASE compared — and **scanned after every single step**, in both themes at 1280px and 380px. Nothing is injected into the page: reduced motion is asked for and asserted, so the lab's own `prefers-reduced-motion` block is exercised rather than bypassed. `violations` is not the whole oracle — the gate also fails on axe's `incomplete` bucket, on an arithmetic composite-aware contrast measurement (opacity and `color-mix()` included), on any scrolling region with no keyboard route, on any horizontal document overflow, and on any visible text left at `opacity: 0`. The Pages deploy is blocked on failure.
 - **Deploy**: GitHub Actions checks out this repo and the hub side by side, runs typecheck → tests → build → a11y gate → Pages.
 
