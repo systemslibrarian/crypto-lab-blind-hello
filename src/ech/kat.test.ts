@@ -45,6 +45,15 @@ const baseVectors = (vectors as unknown as Vector[]).filter((v) => v.mode === MO
 
 test('the hub ships both Base-mode RFC 9180 vectors this lab certifies against', () => {
   expect(baseVectors).toHaveLength(2);
+  // RFC 9180 A.1.1.1 and A.2.1.1 each print SIX encryptions -- sequence
+  // numbers 0, 1, 2, 4, 255 and 256. The hub's vector file carries five of
+  // those six, omitting sequence number 4, so what runs below is 10 of the
+  // RFC's 12 Base-mode encryptions and the README says 10 of 12 rather than
+  // "all". If the hub adds the missing rows, this is what says so.
+  for (const v of baseVectors) {
+    expect(v.encryptions.map((e) => e.seq)).toEqual([0, 1, 2, 255, 256]);
+    expect(v.exports).toHaveLength(3);
+  }
 });
 
 for (const v of baseVectors) {
@@ -90,7 +99,7 @@ for (const v of baseVectors) {
       expect(bytesToHex(r.schedule.baseNonce)).toBe(v.base_nonce);
     });
 
-    test(`Seal reproduces all ${v.encryptions.length} vector ciphertexts (nonce sequencing included)`, async () => {
+    test(`Seal reproduces the ${v.encryptions.length} vector ciphertexts the hub ships, of the RFC's 6 (nonce sequencing included)`, async () => {
       const s = setupSender({
         mode: MODE_BASE,
         aeadId,
