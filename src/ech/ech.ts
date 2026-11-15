@@ -1,5 +1,5 @@
 /**
- * Encrypted Client Hello (draft-ietf-tls-esni §5–§7) — the ECH-specific
+ * Encrypted Client Hello (RFC 9849 §5–§7) — the ECH-specific
  * construction, hand-rolled: encoding + padding of ClientHelloInner, the
  * "outer is the AAD" binding, GREASE, and the server's trial decryption with
  * the retry_configs recovery path.

@@ -1,5 +1,5 @@
 /**
- * ECHConfig / ECHConfigList (draft-ietf-tls-esni §4) — the public-key handout
+ * ECHConfig / ECHConfigList (RFC 9849 §4) — the public-key handout
  * a server publishes (via the DNS HTTPS RR) so clients can encrypt their
  * ClientHelloInner to it.
  *
@@ -10,7 +10,7 @@
 import { AEAD_AES_128_GCM, type AeadId, bytesToHex, concatBytes, KDF_ID, KEM_ID, utf8 } from './hub';
 import { ByteReader, u16, u8, vec16, vec8, WireError } from './wire';
 
-/** encrypted_client_hello wire version (draft-ietf-tls-esni, "ECHConfig.version"). */
+/** encrypted_client_hello wire version (RFC 9849 §4, "ECHConfig.version"). */
 export const ECH_VERSION = 0xfe0d;
 
 export interface HpkeSymmetricCipherSuite {

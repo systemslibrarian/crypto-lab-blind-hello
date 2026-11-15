@@ -5,7 +5,7 @@
  *
  * ECH uses HPKE in Base mode only, so this lab pins the two Base-mode
  * vectors: A.1.1 (DHKEM(X25519, HKDF-SHA256), HKDF-SHA256, AES-128-GCM) and
- * A.2.1 (same KEM/KDF, ChaCha20-Poly1305). draft-ietf-tls-esni itself
+ * A.2.1 (same KEM/KDF, ChaCha20-Poly1305). RFC 9849 itself
  * publishes no test vectors; the ECH layer is verified structurally and by
  * round-trip in ech.test.ts, and says so honestly.
  */
