@@ -486,7 +486,7 @@ export async function driveAllStates(page: Page, theme: string): Promise<void> {
   // makes this a scan of the finished reveal.
   await expect(page.locator('.wirecard')).toHaveCount(2);
   await expect(page.locator('.wirecard .verdicts')).toHaveCount(2);
-  await expect(page.locator('.obs-narrator')).toHaveText(/that field is the whole point/);
+  await expect(page.locator('.obs-narrator')).toHaveText(/Compare it with the public name/);
   await scanAt('both ClientHellos observed — alarm verdict on the plain one, ok on the ECH one');
 
   // ── Changing the destination retires the verdicts that named the old one ──
@@ -496,16 +496,15 @@ export async function driveAllStates(page: Page, theme: string): Promise<void> {
   await scanAt('destination changed — observer verdicts retired');
 
   await sendBoth.click();
-  await expect(page.locator('.obs-narrator')).toHaveText(/that field is the whole point/);
+  await expect(page.locator('.obs-narrator')).toHaveText(/Compare it with the public name/);
   await scanAt('observer re-run for the second preset destination');
 
   // ── The custom-hostname branch of the destination fork ───────────────────
   await page.locator('#obs-host').selectOption('__custom');
   await expect(page.locator('#obs-custom')).toBeVisible();
-  // Selecting "custom" does NOT change the hostname, so the previous verdicts
-  // are still on screen and still current — an empty text field beside a live
-  // result is its own state.
-  await expect(page.locator('.wirecard')).toHaveCount(2);
+  // A blank draft supplies no destination for either ClientHello.
+  await expect(page.locator('.wirecard')).toHaveCount(0);
+  await expect(sendBoth).toBeDisabled();
   await scanAt('custom-hostname field revealed, still empty');
 
   await page.locator('#obs-custom').fill('clinic.internal.example');
@@ -513,7 +512,7 @@ export async function driveAllStates(page: Page, theme: string): Promise<void> {
   await scanAt('custom destination typed — verdicts retired again');
 
   await sendBoth.click();
-  await expect(page.locator('.obs-narrator')).toHaveText(/that field is the whole point/);
+  await expect(page.locator('.obs-narrator')).toHaveText(/Compare it with the public name/);
   await scanAt('observer run for a custom destination');
 
   // ── Inner/outer construction, then the swap attack ───────────────────────
@@ -562,10 +561,12 @@ export async function driveAllStates(page: Page, theme: string): Promise<void> {
   await expect(page.locator('.chip-ok').filter({ hasText: 'recovered' })).toBeVisible();
   await scanAt('recovered from the rotation');
 
-  // ── The substituted-config attack: valid crypto, wrong recipient ─────────
-  await page.getByRole('button', { name: /substituted-config attack/i }).click();
-  await expect(page.locator('.trust-out .chip-alarm')).toBeVisible();
-  await scanAt('substituted-config attack — DISCLOSURE, rendered as alarm not success');
+  if (process.env.BLIND_HELLO_PAGES !== '1') {
+    // ── The substituted-config attack: valid crypto, wrong recipient ─────────
+    await page.getByRole('button', { name: /substituted-config attack/i }).click();
+    await expect(page.locator('.trust-out .chip-alarm')).toBeVisible();
+    await scanAt('substituted-config attack — DISCLOSURE, rendered as alarm not success');
+  }
 
   // ── GREASE ───────────────────────────────────────────────────────────────
   await page.getByRole('button', { name: /GREASE client on the wire/ }).click();

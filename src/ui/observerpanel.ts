@@ -100,7 +100,7 @@ export function observerPanel(): HTMLElement {
       'p',
       { class: 'panel-lede' },
       'Pick a destination and put both first packets on the wire: a plain TLS 1.3 ClientHello and one carrying ECH. ' +
-        'The observer below parses only the bytes shown — same wire, same parser, one field different.',
+        'The observer below parses only the bytes shown — same parser, two packets. Compare the server names and the presence of the ECH extension.',
     ),
     el(
       'p',
@@ -119,14 +119,20 @@ export function observerPanel(): HTMLElement {
     placeholder: 'my-private-site.example',
     hidden: true,
   });
-  select.addEventListener('change', () => {
+  function updateDestination(): void {
     const isCustom = select.value === '__custom';
     custom.hidden = !isCustom;
-    if (!isCustom) setHostname(select.value);
-  });
-  custom.addEventListener('input', () => {
-    if (custom.value.trim()) setHostname(custom.value.trim());
-  });
+    const host = isCustom ? custom.value.trim() : select.value;
+    if (!host) {
+      retire(emptyPrompt);
+      return;
+    }
+    setHostname(host);
+    if (!running) runBtn.disabled = false;
+    if (narrator.textContent === emptyPrompt) narrator.textContent = 'Ready to send both ClientHellos.';
+  }
+  select.addEventListener('change', updateDestination);
+  custom.addEventListener('input', updateDestination);
 
   const runBtn = el('button', { class: 'btn btn-primary', type: 'button' }, 'Send both ClientHellos');
   const controls = el(
@@ -142,7 +148,12 @@ export function observerPanel(): HTMLElement {
   const results = el('div', { class: 'wire-grid' });
   panel.append(narrator, results);
 
+  const emptyPrompt = 'Enter a custom destination before sending either ClientHello.';
+  let generation = 0;
+  let running = false;
   async function run(): Promise<void> {
+    const thisRun = ++generation;
+    running = true;
     runBtn.disabled = true;
     narrator.textContent = 'Building both ClientHellos and sealing the ECH one…';
     results.replaceChildren();
@@ -150,6 +161,7 @@ export function observerPanel(): HTMLElement {
       const host = state.hostname;
       const plainWire = plainClientHello(host);
       const sealed = await sealEch({ innerServerName: host, config: state.server.config });
+      if (thisRun !== generation) return;
       const plainReport = observeClientHello(plainWire, { ip: SERVER_IP, port: 443 });
       const echReport = observeClientHello(sealed.wire, { ip: SERVER_IP, port: 443 });
 
@@ -165,7 +177,7 @@ export function observerPanel(): HTMLElement {
         wire: plainWire,
         report: plainReport,
         verdict: [
-          chip('fact', 'TLS 1.3 crypto:', 'flawless — every record after the handshake is encrypted (protocol property; the handshake itself lives in the tls-handshake lab)'),
+          chip('fact', 'TLS 1.3 crypto:', 'the ClientHello is sent before the server and client establish their handshake traffic keys'),
           plainExposed
             ? chip('alarm', 'Privacy verdict:', `observer read your destination “${plainReport.sniVisible}” — EXPOSED`)
             : chip('ok', 'Privacy verdict:', 'destination not present in this packet'),
@@ -198,23 +210,33 @@ export function observerPanel(): HTMLElement {
       for (let i = 0; i < plain.steps.length; i++) {
         narrator.textContent = narration[i];
         await Promise.all([plain.steps[i](), ech.steps[i]()]);
+        if (thisRun !== generation) return;
       }
-      narrator.textContent = 'Same wire, same observer, one field — that field is the whole point of ECH.';
+      narrator.textContent = 'The plain ClientHello names the destination. Compare it with the public name in the ECH outer ClientHello.';
     } catch (e) {
-      narrator.textContent = `Failed: ${(e as Error).message}`;
+      if (thisRun === generation) narrator.textContent = `Failed: ${(e as Error).message}`;
     } finally {
-      runBtn.disabled = false;
+      if (thisRun === generation) {
+        running = false;
+        runBtn.disabled = false;
+      }
     }
   }
 
   // A privacy verdict names the destination it was computed for. Change the
   // destination and that verdict is about a hostname you are no longer sending,
   // so it is retired rather than left under the new selection.
-  onLabInputChange(() => {
-    if (!results.firstChild) return;
+  function retire(message: string): void {
+    generation++;
+    running = false;
     results.replaceChildren();
-    narrator.textContent =
-      'Inputs changed: those verdicts were computed for a different destination or a different server key, so they have been retired. Send both ClientHellos again.';
+    const empty = select.value === '__custom' && !custom.value.trim();
+    runBtn.disabled = empty;
+    narrator.textContent = message;
+  }
+  onLabInputChange(() => {
+    if (!running && !results.firstChild && !narrator.textContent) return;
+    retire('Inputs changed. The previous results have been retired. Send both ClientHellos again.');
   });
 
   runBtn.addEventListener('click', () => void run());
