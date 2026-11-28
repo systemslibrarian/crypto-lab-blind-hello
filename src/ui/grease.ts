@@ -11,12 +11,12 @@ import { PUBLIC_NAME, SERVER_IP, state } from './state';
 export function greasePanel(): HTMLElement {
   const panel = el('section', { class: 'panel', 'aria-labelledby': 'grease-h' });
   panel.append(
-    el('h2', { id: 'grease-h' }, 'GREASE — everyone sends ECH, even those who can’t'),
+    el('h2', { id: 'grease-h' }, 'GREASE — an ECH-shaped extension without a server config'),
     el(
       'p',
       { class: 'panel-lede' },
       'Suppose only clients with a real ECHConfig sent the extension. Then “sends ECH” itself would tag exactly the users trying to hide — a censor could select on it. ' +
-        'So clients WITHOUT a config send a fake one: random config_id, a fresh random KEM share, random bytes where the ciphertext would be. ' +
+        'A client without a config can send a GREASE extension: random config_id, a fresh random KEM share, random bytes where the ciphertext would be. ' +
         'Anti-fingerprinting as a design requirement, in the spec itself.',
     ),
   );
@@ -43,7 +43,7 @@ export function greasePanel(): HTMLElement {
         ['cipher suite', `HKDF-SHA256 / ${AEAD_NAMES[real.echOuter!.aeadId as AeadId]}`, `HKDF-SHA256 / ${AEAD_NAMES[fake.echOuter!.aeadId as AeadId]}`],
         ['enc length', `${real.echOuter!.encLen} B`, `${fake.echOuter!.encLen} B`],
         ['payload length', `${real.echOuter!.payloadLen} B`, `${fake.echOuter!.payloadLen} B`],
-        ['payload contents', 'HPKE ciphertext (uniform bytes)', 'random bytes (uniform bytes)'],
+        ['payload contents', 'HPKE ciphertext', 'random bytes (uniform bytes)'],
       ];
       const table = el('table', { class: 'fieldtable compare' });
       table.append(el('caption', { class: 'sr-only' }, 'Observer-visible ECH fields: real client vs GREASE client'));
@@ -66,16 +66,16 @@ export function greasePanel(): HTMLElement {
           'div',
           { class: 'verdicts' },
           structurallyIdentical
-            ? chip('ok', 'Computed comparison:', 'field-for-field identical structure and lengths — this observer has no bit to select on')
-            : chip('alarm', 'Computed comparison:', 'structures differ — GREASE would be distinguishable (this should not happen)'),
+            ? chip('ok', 'Computed comparison:', 'Matching ECH extension shape in this pair: same cipher suite, encapsulated-key length and payload length.')
+            : chip('alarm', 'Computed comparison:', 'At least one compared suite or length differs for this pair.'),
           chip(
             'fact',
             'Server’s handling of the GREASE hello (just ran):',
             `hpkeOpen=${greaseResult.hpkeOpen}, action=${greaseResult.action}, retry_configs ${greaseResult.retryConfigs ? 'offered' : 'absent'} — ` +
-              'identical outward behavior to a failed real decryption, so the server does not out the GREASE sender either.',
+              'this model follows its ordinary failed-decryption path.',
           ),
         ),
-        el('p', { class: 'note' }, 'Config_ids are single random bytes, so a GREASE id can collide with a real one; the server then trial-decrypts and fails, landing in the same path. Nothing distinguishes the two from outside.'),
+        el('p', { class: 'note' }, 'Config_ids are single random bytes, so a GREASE id can collide with a real one; the server then trial-decrypts and fails, landing in the same path. The comparison covers only the selected extension fields. Outer SNI, config_id patterns and later handshake behavior can still distinguish connections in a deployment.'),
       );
     } finally {
       btn.disabled = false;

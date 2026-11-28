@@ -10,9 +10,9 @@ export function introPanel(): HTMLElement {
       'p',
       { class: 'panel-lede' },
       'When your browser opens a secure connection, TLS 1.3 encrypts nearly everything — the server’s certificate, every page, every byte after the handshake. ' +
-        'But the very first packet has to say which site it wants, in a field called SNI, and that field is plain text. ' +
+        'Without ECH, the initial ClientHello usually carries the destination hostname in a visible field called SNI. ' +
         'Anyone on the path — a coffee-shop router, an ISP, a national firewall — reads your destination without breaking any cryptography at all. ' +
-        'Encrypted Client Hello (ECH) encrypts that one field. This lab shows the leak, the fix, and the honest catches.',
+        'Encrypted Client Hello (ECH) seals a private ClientHelloInner containing the hostname and other sensitive parameters. The public ClientHelloOuter stays visible. Follow the SNI field to see which name an observer can read.',
     ),
     el(
       'details',

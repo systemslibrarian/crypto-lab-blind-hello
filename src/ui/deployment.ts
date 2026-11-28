@@ -17,7 +17,7 @@ export function deploymentPanel(): HTMLElement {
       el('li', { role: 'listitem' }, 'Unauthenticated DNS can let an attacker strip or substitute the ECH configuration before the client attempts ECH; this is a configuration-delivery attack, described in ', el('a', { href: 'https://www.rfc-editor.org/rfc/rfc9849.html#section-10.2' }, 'RFC 9849 §10.2'), '.'),
       el('li', { role: 'listitem' }, 'Managed enterprise policy may disable ECH depending on client implementation and deployment settings (', el('a', { href: 'https://www.rfc-editor.org/rfc/rfc9849.html#section-8.2' }, 'RFC 9849 §8.2'), '). This panel explains protocol requirements, not tested browser fallback behavior.'),
       el('li', { role: 'listitem' }, 'ECH hides which site you reached only within the set of sites behind the same provider. A site alone on its own IP address is identified by the address itself; no ClientHello field changes that.'),
-      el('li', { role: 'listitem' }, 'ECH does not hide packet sizes, timing, or traffic patterns. Fingerprinting attacks on those signals are real and out of this lab’s scope.'),
+      el('li', { role: 'listitem' }, 'ECH protects one connection at a time. A page may fetch images, fonts or scripts from other hosts. Those destination IPs, or a companion connection that sends a hostname in cleartext, can identify the page even if its main connection uses ECH and encrypted DNS. Packet sizes and timing also remain visible.'),
     ),
     el(
       'aside',

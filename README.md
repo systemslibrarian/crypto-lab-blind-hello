@@ -1,10 +1,10 @@
 # Blind Hello — TLS Encrypted Client Hello (ECH)
 
-**The ClientHello SNI field encrypted under HPKE — showing that TLS protected everything except the one field that says who you're talking to.**
+**Follow the hostname from a plaintext ClientHello into an encrypted ClientHelloInner, and inspect what remains visible on the wire.**
 
 ## What It Is
 
-TLS 1.3 (RFC 9846) encrypts the server's certificate and every byte after the handshake — and then announces the destination hostname in cleartext, in the SNI field of the very first packet. Encrypted Client Hello ([RFC 9849, March 2026](https://www.rfc-editor.org/rfc/rfc9849.html); problem statement in RFC 8744) is HPKE (RFC 9180) applied to that one field: the client builds a second, secret ClientHello naming the real destination, seals it to the server's published key, and ships it inside a decoy ClientHello that names only the provider's public hostname.
+TLS 1.3 (RFC 9846) encrypts the server’s certificate and application data. Without ECH, the initial ClientHello commonly reveals the destination hostname in SNI. Encrypted Client Hello ([RFC 9849, March 2026](https://www.rfc-editor.org/rfc/rfc9849.html); problem statement in RFC 8744) uses HPKE (RFC 9180) to seal an encoded ClientHelloInner containing SNI and other sensitive parameters. The visible ClientHelloOuter uses the provider’s public hostname.
 
 The lesson: a protocol can be cryptographically flawless and still leak the metadata that actually matters. Both indicators are rendered separately throughout this demo — "the crypto is valid" and "your hostname leaked" are shown side by side, because both are true at once.
 
@@ -19,7 +19,7 @@ This lab is the first consumer of the fleet's HPKE hub: every seal and open runs
 3. **The bootstrap problem** (the honest centerpiece): the ECH key arrives via the DNS HTTPS record (real RFC 9460 RDATA encoding shown). Run the lookup over plaintext DNS and the observer reads your destination before TLS ever starts; switch to encrypted DNS (modeled, labelled) to close the leak. The circularity is named in-page: ECH requires DoH/DoT to mean anything.
 4. **Break it yourself**: flip one bit of the ECHConfig public key, or use a stale key after the server rotates — the server's real HPKE decryption fails, fail-closed, and the retry_configs recovery path completes a successful second attempt.
 5. **Whose key did you encrypt to?**: the config-authenticity attack. An active attacker substitutes their own ECHConfig (same public name, same config_id, their key); the client seals to it and **the attacker really decrypts and reads your destination** — valid cryptography, wrong recipient, rendered as ALARM not success. A delivery-channel table then shows why plaintext DNS is forgeable but retry_configs (inside the public name's certificate-authenticated TLS) is not.
-6. **GREASE**: a client with no ECHConfig sends a fake ECH extension; a field-for-field comparison (computed from the parsed bytes, not asserted) shows the observer has no bit to select on. If only ECH users sent ECH, ECH would be a selector.
+6. **GREASE**: a client with no ECHConfig sends a fake ECH extension; the parsed extensions in the synthetic pair match on cipher suite, encapsulated-key length and payload length. This does not establish that whole handshakes are indistinguishable. If only ECH users sent ECH, ECH would be a selector.
 7. **Deployment honesty**: RFC 9849 status, deployment examples, blocking versus authenticated retry/disablement and enterprise policy, and precisely what this demo does and does not prove.
 
 ## When to Use It
@@ -41,6 +41,7 @@ This lab is the first consumer of the fleet's HPKE hub: every seal and open runs
 - **Networks that block ECH** — dropping traffic can deny availability. After ECH rejection, [RFC 9849 §6.1.6](https://www.rfc-editor.org/rfc/rfc9849.html#section-6.1.6) requires public-name authentication of the outer handshake; authentication or handshake failure must fail and must not be treated as a secure signal to disable ECH. After successful authentication and handshake completion, the rejected connection is aborted before application data. Supported retry_configs guide a new ECH attempt. If no retry config has a supported version, the server omits the ECH extension in EncryptedExtensions, or an earlier TLS version was negotiated, the authenticated result can securely disable ECH and guide a new connection without it.
 - **Unauthenticated DNS configuration** — an attacker can strip or substitute ECH configurations before an ECH attempt ([§10.2](https://www.rfc-editor.org/rfc/rfc9849.html#section-10.2)); this differs from dropping an attempted ECH connection.
 - **Enterprise policy** — managed clients may disable ECH under implementation-specific policy ([§8.2](https://www.rfc-editor.org/rfc/rfc9849.html#section-8.2)). This is protocol guidance, not a browser-product fallback test.
+- **Companion connections** — a page can load fonts, scripts or images from other hosts. Their destination IPs or visible hostnames can identify the page even when its primary connection uses ECH and encrypted DNS.
 - **A dedicated IP** — ECH hides *which* site behind a shared provider; an IP hosting one site identifies itself.
 - **A substituted config** — ECH's privacy is only as trustworthy as the channel that delivered the ECHConfig. An attacker who can forge that channel (plaintext DNS) hands the client their own key and reads the destination with valid cryptography. Exhibit 5 runs this live.
 

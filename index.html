@@ -147,7 +147,7 @@
         </div>
         <aside class="cl-hero-why" aria-label="Why it matters">
           <span class="cl-hero-why-label">WHY IT MATTERS</span>
-          <p class="cl-hero-why-text">TLS 1.3 encrypts your traffic — then announces who you're talking to, in cleartext, in the first packet. That one field is what ISPs log and censors filter on. ECH closes the last window, which is exactly why several networks fight it.</p>
+          <p class="cl-hero-why-text">A TLS connection can protect page contents while its first ClientHello reveals the hostname. ECH encrypts a private ClientHelloInner containing SNI and other parameters. An observer still sees the outer hello, destination IP and traffic pattern.</p>
         </aside>
       </header>
     </div>
